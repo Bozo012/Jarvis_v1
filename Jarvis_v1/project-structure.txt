@@ -1,0 +1,40 @@
+local-ai-assistant/
+├── .env.example
+├── Dockerfile
+├── docker-compose.yml
+├── requirements.txt
+├── README.md
+├── setup.py
+├── run.py
+├── cli.py
+├── config/
+│   ├── __init__.py
+│   └── settings.py
+├── core/
+│   ├── __init__.py
+│   ├── audio_listener.py
+│   ├── command_processor.py
+│   ├── llm.py
+│   ├── stt.py
+│   ├── tts.py
+│   ├── wake_word.py
+│   └── task_scheduler.py
+├── integrations/
+│   ├── __init__.py
+│   ├── home_assistant.py
+│   ├── web_automation.py
+│   ├── media_control.py
+│   ├── sms.py
+│   ├── email.py
+│   └── tv/
+│       ├── __init__.py
+│       ├── hdmi_cec.py
+│       ├── ir_blaster.py
+│       └── smart_tv.py
+├── api/
+│   ├── __init__.py
+│   ├── server.py
+│   └── routes.py
+└── mcp/
+    ├── __init__.py
+    └── controller.py

@@ -1,0 +1,53 @@
+# General settings
+DEBUG=false
+LOG_LEVEL=INFO
+HOST=0.0.0.0
+PORT=8000
+AUDIO_DEVICE_INDEX=0
+
+# LLM settings
+OLLAMA_HOST=http://localhost:11434
+LLM_MODEL=llama3
+
+# Wake word settings
+PORCUPINE_ACCESS_KEY=your_picovoice_access_key
+WAKE_WORD_PATH=path/to/custom/wake_word.ppn
+WAKE_WORD_SENSITIVITY=0.5
+
+# STT settings
+WHISPER_MODEL=base
+WHISPER_LANGUAGE=en
+
+# TTS settings
+TTS_MODEL=tts_models/en/vctk/vits
+TTS_SPEAKER=p326
+TTS_LANGUAGE=en
+
+# Home Assistant settings
+HASS_URL=http://homeassistant.local:8123
+HASS_TOKEN=your_long_lived_access_token
+
+# Media control settings
+MPD_HOST=localhost
+MPD_PORT=6600
+SPOTIFY_CLIENT_ID=your_spotify_client_id
+SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
+SPOTIFY_REDIRECT_URI=http://localhost:8888/callback
+
+# SMS settings (Twilio)
+TWILIO_ACCOUNT_SID=your_twilio_account_sid
+TWILIO_AUTH_TOKEN=your_twilio_auth_token
+TWILIO_PHONE_NUMBER=your_twilio_phone_number
+
+# Email settings
+SMTP_SERVER=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your_email@gmail.com
+SMTP_PASSWORD=your_app_password
+EMAIL_FROM=your_email@gmail.com
+
+# TV control settings
+TV_TYPE=webos  # Options: webos, roku, hdmi-cec, ir
+TV_IP=192.168.1.100
+TV_MAC=00:11:22:33:44:55  # For WebOS Wake-on-LAN
+IR_BLASTER_GPIO_PIN=17    # For Raspberry Pi GPIO IR blaster

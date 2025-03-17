@@ -1,0 +1,361 @@
+import threading
+import time
+from datetime import datetime, timedelta
+from typing import Dict, List, Any, Optional, Callable
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.date import DateTrigger
+from apscheduler.triggers.interval import IntervalTrigger
+from loguru import logger
+
+
+class TaskScheduler:
+    """
+    Task scheduler for scheduling and executing tasks.
+    Uses APScheduler for scheduling tasks.
+    """
+    
+    def __init__(self):
+        self.scheduler = BackgroundScheduler()
+        self.command_callback = None
+        self.running = False
+        
+    def set_command_callback(self, callback: Callable[[str], str]):
+        """
+        Set callback function for executing commands.
+        
+        Args:
+            callback: Function to call with command text
+        """
+        self.command_callback = callback
+        
+    def start(self):
+        """Start the scheduler."""
+        if self.running:
+            logger.warning("Task scheduler is already running")
+            return
+            
+        try:
+            # Start the APScheduler
+            self.scheduler.start()
+            self.running = True
+            logger.info("Task scheduler started")
+            
+        except Exception as e:
+            logger.error(f"Error starting task scheduler: {e}")
+            
+    def stop(self):
+        """Stop the scheduler."""
+        if not self.running:
+            logger.warning("Task scheduler is not running")
+            return
+            
+        try:
+            # Shut down the APScheduler
+            self.scheduler.shutdown()
+            self.running = False
+            logger.info("Task scheduler stopped")
+            
+        except Exception as e:
+            logger.error(f"Error stopping task scheduler: {e}")
+            
+    def add_job(self, job_id: str, command: str, trigger: Any, **kwargs) -> bool:
+        """
+        Add a job to the scheduler.
+        
+        Args:
+            job_id: Unique job identifier
+            command: Command to execute
+            trigger: APScheduler trigger
+            **kwargs: Additional arguments for trigger
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.running or not self.command_callback:
+            logger.error("Task scheduler is not running or command callback is not set")
+            return False
+            
+        try:
+            # Define job function
+            def execute_job():
+                try:
+                    logger.info(f"Executing scheduled task: {job_id} - {command}")
+                    self.command_callback(command)
+                except Exception as e:
+                    logger.error(f"Error executing scheduled task {job_id}: {e}")
+                    
+            # Add job to scheduler
+            self.scheduler.add_job(
+                execute_job,
+                trigger,
+                id=job_id,
+                replace_existing=True,
+                **kwargs
+            )
+            
+            logger.info(f"Added scheduled task: {job_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error adding scheduled task {job_id}: {e}")
+            return False
+            
+    def remove_job(self, job_id: str) -> bool:
+        """
+        Remove a job from the scheduler.
+        
+        Args:
+            job_id: Job identifier
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.running:
+            logger.error("Task scheduler is not running")
+            return False
+            
+        try:
+            self.scheduler.remove_job(job_id)
+            logger.info(f"Removed scheduled task: {job_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error removing scheduled task {job_id}: {e}")
+            return False
+            
+    def get_jobs(self) -> List[Dict[str, Any]]:
+        """
+        Get list of all scheduled jobs.
+        
+        Returns:
+            List of job dictionaries
+        """
+        if not self.running:
+            logger.error("Task scheduler is not running")
+            return []
+            
+        try:
+            jobs = []
+            for job in self.scheduler.get_jobs():
+                trigger_info = {}
+                
+                # Extract trigger information based on trigger type
+                if isinstance(job.trigger, DateTrigger):
+                    trigger_info = {
+                        "type": "date",
+                        "run_date": job.trigger.run_date
+                    }
+                elif isinstance(job.trigger, IntervalTrigger):
+                    trigger_info = {
+                        "type": "interval",
+                        "interval": job.trigger.interval.total_seconds(),
+                        "start_date": job.trigger.start_date,
+                        "end_date": job.trigger.end_date
+                    }
+                elif isinstance(job.trigger, CronTrigger):
+                    trigger_info = {
+                        "type": "cron",
+                        "fields": job.trigger.fields
+                    }
+                    
+                jobs.append({
+                    "id": job.id,
+                    "next_run_time": job.next_run_time,
+                    "trigger": trigger_info
+                })
+                
+            return jobs
+            
+        except Exception as e:
+            logger.error(f"Error getting scheduled tasks: {e}")
+            return []
+            
+    def schedule_once(self, job_id: str, command: str, run_date: datetime) -> bool:
+        """
+        Schedule a task to run once at a specific time.
+        
+        Args:
+            job_id: Job identifier
+            command: Command to execute
+            run_date: Date and time to run the task
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        return self.add_job(job_id, command, 'date', run_date=run_date)
+        
+    def schedule_interval(self, job_id: str, command: str, 
+                        seconds: int = 0, minutes: int = 0, 
+                        hours: int = 0, days: int = 0,
+                        start_date: Optional[datetime] = None) -> bool:
+        """
+        Schedule a task to run at regular intervals.
+        
+        Args:
+            job_id: Job identifier
+            command: Command to execute
+            seconds: Interval seconds
+            minutes: Interval minutes
+            hours: Interval hours
+            days: Interval days
+            start_date: Start date (default: now)
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        return self.add_job(
+            job_id, 
+            command, 
+            'interval', 
+            seconds=seconds,
+            minutes=minutes,
+            hours=hours,
+            days=days,
+            start_date=start_date
+        )
+        
+    def schedule_cron(self, job_id: str, command: str, 
+                    year: str = None, month: str = None, 
+                    day: str = None, week: str = None, 
+                    day_of_week: str = None, hour: str = None, 
+                    minute: str = None, second: str = None) -> bool:
+        """
+        Schedule a task using cron expression.
+        
+        Args:
+            job_id: Job identifier
+            command: Command to execute
+            year: Year (cron syntax)
+            month: Month (cron syntax)
+            day: Day of month (cron syntax)
+            week: Week of year (cron syntax)
+            day_of_week: Day of week (cron syntax)
+            hour: Hour (cron syntax)
+            minute: Minute (cron syntax)
+            second: Second (cron syntax)
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        return self.add_job(
+            job_id,
+            command,
+            'cron',
+            year=year,
+            month=month,
+            day=day,
+            week=week,
+            day_of_week=day_of_week,
+            hour=hour,
+            minute=minute,
+            second=second
+        )
+        
+    def schedule_daily(self, job_id: str, command: str, hour: int, minute: int) -> bool:
+        """
+        Schedule a task to run daily at a specific time.
+        
+        Args:
+            job_id: Job identifier
+            command: Command to execute
+            hour: Hour (0-23)
+            minute: Minute (0-59)
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        return self.schedule_cron(
+            job_id,
+            command,
+            hour=str(hour),
+            minute=str(minute)
+        )
+        
+    def schedule_weekly(self, job_id: str, command: str, 
+                      day_of_week: int, hour: int, minute: int) -> bool:
+        """
+        Schedule a task to run weekly on a specific day and time.
+        
+        Args:
+            job_id: Job identifier
+            command: Command to execute
+            day_of_week: Day of week (0-6, where 0 is Monday)
+            hour: Hour (0-23)
+            minute: Minute (0-59)
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        return self.schedule_cron(
+            job_id,
+            command,
+            day_of_week=str(day_of_week),
+            hour=str(hour),
+            minute=str(minute)
+        )
+        
+    def parse_natural_language_schedule(self, job_id: str, command: str, 
+                                      schedule_text: str) -> bool:
+        """
+        Parse natural language schedule and add job.
+        
+        Args:
+            job_id: Job identifier
+            command: Command to execute
+            schedule_text: Natural language schedule text
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        # Very basic parsing
+        schedule_text = schedule_text.lower()
+        now = datetime.now()
+        
+        try:
+            if "every day at" in schedule_text or "daily at" in schedule_text:
+                time_part = schedule_text.split("at")[1].strip()
+                if ":" in time_part:
+                    hour, minute = map(int, time_part.split(":"))
+                else:
+                    hour = int(time_part)
+                    minute = 0
+                    
+                return self.schedule_daily(job_id, command, hour, minute)
+                
+            elif "every" in schedule_text and "minutes" in schedule_text:
+                minutes = int(schedule_text.split("every")[1].split("minutes")[0].strip())
+                return self.schedule_interval(job_id, command, minutes=minutes)
+                
+            elif "every" in schedule_text and "hours" in schedule_text:
+                hours = int(schedule_text.split("every")[1].split("hours")[0].strip())
+                return self.schedule_interval(job_id, command, hours=hours)
+                
+            elif "tomorrow at" in schedule_text:
+                time_part = schedule_text.split("at")[1].strip()
+                if ":" in time_part:
+                    hour, minute = map(int, time_part.split(":"))
+                else:
+                    hour = int(time_part)
+                    minute = 0
+                    
+                run_date = (now + timedelta(days=1)).replace(hour=hour, minute=minute, second=0, microsecond=0)
+                return self.schedule_once(job_id, command, run_date)
+                
+            elif "in" in schedule_text and "minutes" in schedule_text:
+                minutes = int(schedule_text.split("in")[1].split("minutes")[0].strip())
+                run_date = now + timedelta(minutes=minutes)
+                return self.schedule_once(job_id, command, run_date)
+                
+            elif "in" in schedule_text and "hours" in schedule_text:
+                hours = int(schedule_text.split("in")[1].split("hours")[0].strip())
+                run_date = now + timedelta(hours=hours)
+                return self.schedule_once(job_id, command, run_date)
+                
+            else:
+                logger.error(f"Could not parse schedule text: {schedule_text}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error parsing schedule text {schedule_text}: {e}")
+            return False

@@ -1,0 +1,38 @@
+# Core dependencies
+fastapi==0.104.1
+uvicorn==0.24.0
+typer==0.9.0
+pydantic==2.4.2
+python-dotenv==1.0.0
+requests==2.31.0
+loguru==0.7.2
+apscheduler==3.10.4
+websockets==12.0
+
+# LLM Integration
+ollama==0.1.5
+langchain==0.0.335
+
+# Audio/Speech processing
+pyaudio==0.2.13
+numpy==1.26.1
+openai-whisper==20231117
+pydub==0.25.1
+pvporcupine==3.0.0  # Wake word detection
+
+# TTS
+TTS==0.18.0  # Coqui TTS
+piper-tts==1.2.0
+
+# Integrations
+homeassistant-api==4.0.0
+playwright==1.40.0  # Web automation
+python-mpd2==3.1.0  # MPD client
+spotipy==2.23.0     # Spotify API
+twilio==8.10.0      # SMS
+pywebostv==0.8.9    # LG WebOS
+roku==4.0.0         # Roku
+pycec==0.5.1        # HDMI-CEC
+
+# Docker support
+docker==6.1.3

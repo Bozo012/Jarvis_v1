@@ -1,0 +1,296 @@
+import cec
+import time
+from typing import Dict, List, Any, Optional
+from loguru import logger
+
+
+class HDMICEC:
+    """
+    HDMI-CEC controller for TV control.
+    Provides methods to control TVs and other devices via HDMI-CEC.
+    """
+    
+    def __init__(self):
+        self.libcec = None
+        self.cecconfig = None
+        self.tv_address = 0  # CEC address for TV is usually 0
+        
+    def initialize(self) -> bool:
+        """Initialize CEC adapter."""
+        try:
+            # Initialize libCEC
+            self.cecconfig = cec.libcec.Configuration()
+            self.cecconfig.strDeviceName = "local-ai-assistant"
+            self.cecconfig.bActivateSource = 0
+            self.cecconfig.deviceTypes.Add(cec.CECDEVICE_PLAYBACKDEVICE)
+            
+            # Initialize CEC adapter
+            self.libcec = cec.ICECAdapter.Create(self.cecconfig)
+            adapters = self.libcec.DetectAdapters()
+            
+            if len(adapters) < 1:
+                logger.error("No CEC adapters found")
+                return False
+                
+            # Open first adapter
+            adapter = adapters[0]
+            if not self.libcec.Open(adapter.strComName):
+                logger.error(f"Failed to open CEC adapter {adapter.strComName}")
+                return False
+                
+            logger.info(f"CEC adapter initialized: {adapter.strComName}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error initializing HDMI-CEC: {e}")
+            return False
+            
+    def power_on(self) -> bool:
+        """Turn on the TV."""
+        if not self.libcec:
+            return False
+            
+        try:
+            success = self.libcec.PowerOnDevices(self.tv_address)
+            logger.info(f"Power on TV: {'Success' if success else 'Failed'}")
+            return success
+        except Exception as e:
+            logger.error(f"Error powering on TV: {e}")
+            return False
+            
+    def standby(self) -> bool:
+        """Put the TV in standby mode."""
+        if not self.libcec:
+            return False
+            
+        try:
+            success = self.libcec.StandbyDevices(self.tv_address)
+            logger.info(f"Standby TV: {'Success' if success else 'Failed'}")
+            return success
+        except Exception as e:
+            logger.error(f"Error putting TV in standby: {e}")
+            return False
+            
+    def set_active_source(self) -> bool:
+        """Set this device as the active source."""
+        if not self.libcec:
+            return False
+            
+        try:
+            success = self.libcec.SetActiveSource()
+            logger.info(f"Set active source: {'Success' if success else 'Failed'}")
+            return success
+        except Exception as e:
+            logger.error(f"Error setting active source: {e}")
+            return False
+            
+    def set_hdmi_input(self, input_number: int) -> bool:
+        """
+        Switch to a specific HDMI input.
+        
+        Args:
+            input_number: HDMI input number (1-based)
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.libcec:
+            return False
+            
+        try:
+            # Get CEC version to determine command format
+            cec_version = self.libcec.GetDeviceCecVersion(self.tv_address)
+            
+            if input_number < 1 or input_number > 4:
+                logger.error(f"Invalid HDMI input: {input_number}")
+                return False
+                
+            # Physical address for HDMI ports typically follows this pattern:
+            # HDMI 1: 1.0.0.0
+            # HDMI 2: 2.0.0.0
+            # HDMI 3: 3.0.0.0
+            # HDMI 4: 4.0.0.0
+            physical_addr = (input_number << 12)
+            
+            # Set active source with the physical address
+            command = f"tx {cec.CECDEVICE_BROADCAST:x}f:{cec.CEC_OPCODE_ACTIVE_SOURCE:02x}:{physical_addr >> 8:02x}:{physical_addr & 0xFF:02x}"
+            success = self.libcec.Transmit(self.libcec.CommandFromString(command))
+            
+            logger.info(f"Set HDMI input to {input_number}: {'Success' if success else 'Failed'}")
+            return success
+            
+        except Exception as e:
+            logger.error(f"Error setting HDMI input: {e}")
+            return False
+            
+    def volume_up(self) -> bool:
+        """Increase volume."""
+        if not self.libcec:
+            return False
+            
+        try:
+            success = self.libcec.VolumeUp()
+            logger.info(f"Volume up: {'Success' if success else 'Failed'}")
+            return success
+        except Exception as e:
+            logger.error(f"Error increasing volume: {e}")
+            return False
+            
+    def volume_down(self) -> bool:
+        """Decrease volume."""
+        if not self.libcec:
+            return False
+            
+        try:
+            success = self.libcec.VolumeDown()
+            logger.info(f"Volume down: {'Success' if success else 'Failed'}")
+            return success
+        except Exception as e:
+            logger.error(f"Error decreasing volume: {e}")
+            return False
+            
+    def mute(self) -> bool:
+        """Mute audio."""
+        if not self.libcec:
+            return False
+            
+        try:
+            success = self.libcec.AudioMute()
+            logger.info(f"Mute: {'Success' if success else 'Failed'}")
+            return success
+        except Exception as e:
+            logger.error(f"Error muting audio: {e}")
+            return False
+            
+    def send_remote_key(self, key: int) -> bool:
+        """
+        Send remote control key to TV.
+        
+        Args:
+            key: CEC key code
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.libcec:
+            return False
+            
+        try:
+            success = self.libcec.SendKeypress(self.tv_address, key, False)
+            logger.info(f"Send key {key}: {'Success' if success else 'Failed'}")
+            return success
+        except Exception as e:
+            logger.error(f"Error sending key: {e}")
+            return False
+            
+    def send_key_press(self, key_name: str) -> bool:
+        """
+        Send a key press by name.
+        
+        Args:
+            key_name: Name of the key (up, down, left, right, select, back, menu, etc.)
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        # Map key names to CEC key codes
+        key_map = {
+            "up": cec.CEC_USER_CONTROL_CODE_UP,
+            "down": cec.CEC_USER_CONTROL_CODE_DOWN,
+            "left": cec.CEC_USER_CONTROL_CODE_LEFT,
+            "right": cec.CEC_USER_CONTROL_CODE_RIGHT,
+            "select": cec.CEC_USER_CONTROL_CODE_SELECT,
+            "back": cec.CEC_USER_CONTROL_CODE_BACK,
+            "exit": cec.CEC_USER_CONTROL_CODE_EXIT,
+            "home": cec.CEC_USER_CONTROL_CODE_HOME,
+            "menu": cec.CEC_USER_CONTROL_CODE_ROOT_MENU,
+            "info": cec.CEC_USER_CONTROL_CODE_DISPLAY_INFORMATION,
+            "play": cec.CEC_USER_CONTROL_CODE_PLAY,
+            "pause": cec.CEC_USER_CONTROL_CODE_PAUSE,
+            "stop": cec.CEC_USER_CONTROL_CODE_STOP,
+            "power": cec.CEC_USER_CONTROL_CODE_POWER,
+            "power_toggle": cec.CEC_USER_CONTROL_CODE_POWER_TOGGLE_FUNCTION,
+            "power_on": cec.CEC_USER_CONTROL_CODE_POWER_ON_FUNCTION,
+            "power_off": cec.CEC_USER_CONTROL_CODE_POWER_OFF_FUNCTION
+        }
+        
+        key_name = key_name.lower()
+        if key_name not in key_map:
+            logger.error(f"Unknown key name: {key_name}")
+            return False
+            
+        return self.send_remote_key(key_map[key_name])
+        
+    def get_active_devices(self) -> List[int]:
+        """
+        Get list of active CEC devices.
+        
+        Returns:
+            List of logical addresses of active devices
+        """
+        if not self.libcec:
+            return []
+            
+        try:
+            active_devices = []
+            for i in range(15):  # CEC has 15 logical addresses (0-14)
+                if self.libcec.IsActiveDevice(i):
+                    active_devices.append(i)
+                    
+            return active_devices
+            
+        except Exception as e:
+            logger.error(f"Error getting active devices: {e}")
+            return []
+            
+    def get_device_info(self, logical_address: int) -> Dict[str, Any]:
+        """
+        Get information about a CEC device.
+        
+        Args:
+            logical_address: CEC logical address (0-14)
+            
+        Returns:
+            Device information dictionary
+        """
+        if not self.libcec:
+            return {}
+            
+        try:
+            info = {
+                "address": logical_address,
+                "active": self.libcec.IsActiveDevice(logical_address),
+                "vendor": self.libcec.GetDeviceVendorId(logical_address),
+                "osd_name": self.libcec.GetDeviceOSDName(logical_address),
+                "cec_version": self.libcec.GetDeviceCecVersion(logical_address),
+                "power_status": self.libcec.GetDevicePowerStatus(logical_address),
+                "physical_address": self.libcec.GetDevicePhysicalAddress(logical_address)
+            }
+            
+            # Map vendor ID to name
+            vendor_id = info["vendor"]
+            vendors = {
+                0x002582: "Samsung",
+                0x008045: "LG",
+                0x00903E: "Philips",
+                0x00D0D5: "Sony",
+                0x18C086: "Broadcom",
+                0x5094: "Panasonic",
+                0x534850: "Sharp",
+                0x6B746F: "Toshiba"
+            }
+            
+            info["vendor_name"] = vendors.get(vendor_id, f"Unknown ({hex(vendor_id)})")
+            
+            return info
+            
+        except Exception as e:
+            logger.error(f"Error getting device info: {e}")
+            return {}
+            
+    def cleanup(self):
+        """Release CEC resources."""
+        if self.libcec:
+            self.libcec.Close()
+            self.libcec = None
+            logger.info("HDMI-CEC resources released")

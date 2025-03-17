@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  local-ai-assistant:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: local-ai-assistant
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"  # API port
+    volumes:
+      - .:/app
+      - ./data:/app/data
+      - /dev/snd:/dev/snd  # For audio access
+    devices:
+      - /dev/snd:/dev/snd  # For audio access
+    privileged: true  # Needed for GPIO and HDMI-CEC access
+    network_mode: host  # For easier device discovery and HDMI-CEC
+    depends_on:
+      - ollama
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    command: serve
+
+volumes:
+  ollama-data:
